@@ -7,8 +7,9 @@ import pino from 'pino-http';
 import authRoutes from './modules/auth/auth.routes';
 import productsRoutes from './modules/products/products.routes';
 import storesRoutes from './modules/stores/stores.routes';
+import cartRoutes from './modules/cart/cart.routes';
 import ordersRoutes from './modules/orders/orders.routes';
-import notificationsRoutes from './modules/notifications/notifications.routes';
+// import notificationsRoutes from './modules/notifications/notifications.routes';
 import paymentsRoutes from './modules/payments/payments.routes';
 import groupBuyRoutes from './modules/groupbuy/groupbuy.routes';
 
@@ -35,8 +36,9 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/products', productsRoutes);
 app.use('/api/v1/stores', storesRoutes);
+app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', ordersRoutes);
-app.use('/api/v1/notifications', notificationsRoutes);
+// app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/payments', paymentsRoutes);
 app.use('/api/v1/group-buy', groupBuyRoutes);
 

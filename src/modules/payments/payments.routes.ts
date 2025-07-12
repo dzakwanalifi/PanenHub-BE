@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { validateTripayWebhook, createTripayTransaction } from './payments.service';
 import { supabase } from '../../core/supabaseClient';
-import { sendNotificationToUsers } from '../notifications/notifications.service';
+// import { sendNotificationToUsers } from '../notifications/notifications.service';
 
 const router = Router();
 
@@ -52,13 +52,13 @@ router.post('/webhook', async (req, res) => {
             const sellerIds = [...new Set((orders as OrderWithStore[] || []).flatMap(o => o.stores.map(s => s.owner_id)))];
 
             // Send notification to each seller
-            if (sellerIds.length > 0) {
-                await sendNotificationToUsers(sellerIds, {
-                    title: 'Pesanan Baru Diterima! 🎉',
-                    body: 'Anda baru saja menerima pesanan baru. Segera periksa dashboard Anda!',
-                    data: { url: '/dashboard/orders' }
-                });
-            }
+            // if (sellerIds.length > 0) {
+            //     await sendNotificationToUsers(sellerIds, {
+            //         title: 'Pesanan Baru Diterima! 🎉',
+            //         body: 'Anda baru saja menerima pesanan baru. Segera periksa dashboard Anda!',
+            //         data: { url: '/dashboard/orders' }
+            //     });
+            // }
         } else if (status === 'FAILED' || status === 'EXPIRED') {
             // Panggil RPC untuk menangani pembayaran yang gagal atau kedaluwarsa
             const { error: rpcError } = await supabase.rpc('handle_failed_payment', {

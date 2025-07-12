@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../../core/middleware/auth.middleware';
 import { supabase } from '../../core/supabaseClient';
 import { createTripayTransaction } from '../payments/payments.service';
-import { sendNotificationToUser } from '../notifications/notifications.service';
+// import { sendNotificationToUser } from '../notifications/notifications.service';
 
 const router = Router();
 
@@ -133,14 +133,14 @@ router.put('/:orderId/status', authMiddleware, async (req, res) => {
                     notificationBody = 'Status pesanan Anda telah diperbarui.';
             }
             
-            await sendNotificationToUser(order.buyer_id, {
-                title: notificationTitle,
-                body: notificationBody,
-                data: { 
-                    // URL ini akan dibuka saat pengguna mengklik notifikasi
-                    url: `/transaksi/${orderId}`
-                }
-            });
+            // await sendNotificationToUser(order.buyer_id, {
+            //     title: notificationTitle,
+            //     body: notificationBody,
+            //     data: { 
+            //         // URL ini akan dibuka saat pengguna mengklik notifikasi
+            //         url: `/transaksi/${orderId}`
+            //     }
+            // });
         }
         
         // =================================================================

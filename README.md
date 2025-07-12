@@ -103,6 +103,12 @@ Server akan berjalan di `http://localhost:8080`
 - `PUT /api/v1/products/:id` - Update produk (requires auth)
 - `DELETE /api/v1/products/:id` - Hapus produk (requires auth)
 
+### Cart Module
+- `GET /api/v1/cart` - Mendapatkan isi keranjang belanja (requires auth)
+- `POST /api/v1/cart/items` - Menambahkan item ke keranjang (requires auth)
+- `PUT /api/v1/cart/items/:itemId` - Mengupdate kuantitas item (requires auth)
+- `DELETE /api/v1/cart/items/:itemId` - Menghapus item dari keranjang (requires auth)
+
 ### Orders Module
 - `POST /api/v1/orders/create_from_cart` - Buat pesanan dari keranjang (requires auth)
 - `PUT /api/v1/orders/:orderId/status` - Update status pesanan (requires auth)

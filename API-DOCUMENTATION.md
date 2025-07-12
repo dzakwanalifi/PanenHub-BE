@@ -372,7 +372,129 @@ curl -X DELETE https://panenhub-backend-49479616918.us-central1.run.app/api/v1/p
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
-### 4. Orders Module
+### 4. Cart Module
+
+#### GET /api/v1/cart
+Mendapatkan isi keranjang belanja pengguna (Dilindungi)
+
+**Example Request:**
+```bash
+curl https://panenhub-backend-49479616918.us-central1.run.app/api/v1/cart \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "product_id": "uuid",
+      "quantity": 2,
+      "created_at": "2024-03-01T10:00:00Z",
+      "updated_at": "2024-03-01T10:00:00Z",
+      "product": {
+        "id": "uuid",
+        "title": "Tomat Segar",
+        "price": 15000,
+        "unit": "kg",
+        "store_id": "uuid",
+        "store": {
+          "store_name": "Toko Sayur Segar"
+        }
+      }
+    }
+  ],
+  "total_price": 30000
+}
+```
+
+#### POST /api/v1/cart/items
+Menambahkan item ke keranjang (Dilindungi)
+
+**Example Request:**
+```bash
+curl -X POST https://panenhub-backend-49479616918.us-central1.run.app/api/v1/cart/items \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_id": "uuid",
+    "quantity": 2
+  }'
+```
+
+**Request Body:**
+```json
+{
+  "product_id": "uuid",
+  "quantity": 2
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Item berhasil ditambahkan ke keranjang",
+  "item": {
+    "id": "uuid",
+    "product_id": "uuid",
+    "quantity": 2,
+    "created_at": "2024-03-01T10:00:00Z",
+    "updated_at": "2024-03-01T10:00:00Z"
+  }
+}
+```
+
+#### PUT /api/v1/cart/items/:itemId
+Mengupdate kuantitas item di keranjang (Dilindungi)
+
+**Example Request:**
+```bash
+curl -X PUT https://panenhub-backend-49479616918.us-central1.run.app/api/v1/cart/items/ITEM_ID \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "quantity": 3
+  }'
+```
+
+**Request Body:**
+```json
+{
+  "quantity": 3
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Kuantitas item berhasil diupdate",
+  "item": {
+    "id": "uuid",
+    "product_id": "uuid",
+    "quantity": 3,
+    "updated_at": "2024-03-01T10:30:00Z"
+  }
+}
+```
+
+#### DELETE /api/v1/cart/items/:itemId
+Menghapus item dari keranjang (Dilindungi)
+
+**Example Request:**
+```bash
+curl -X DELETE https://panenhub-backend-49479616918.us-central1.run.app/api/v1/cart/items/ITEM_ID \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "message": "Item berhasil dihapus dari keranjang"
+}
+```
+
+### 5. Orders Module
 
 #### POST /api/v1/orders/create_from_cart
 Membuat pesanan dari keranjang (Dilindungi)
@@ -438,7 +560,7 @@ curl -X PUT https://panenhub-backend-49479616918.us-central1.run.app/api/v1/orde
 }
 ```
 
-### 5. Payments Module
+### 6. Payments Module
 
 #### POST /api/v1/payments/webhook
 Webhook untuk notifikasi pembayaran dari TriPay
@@ -492,7 +614,7 @@ curl -X POST https://panenhub-backend-49479616918.us-central1.run.app/api/v1/pay
 }
 ```
 
-### 6. Notifications Module
+### 7. Notifications Module
 
 #### POST /api/v1/notifications/subscribe
 Mendaftarkan device untuk menerima notifikasi (Dilindungi)
@@ -625,7 +747,7 @@ Endpoint untuk testing pengiriman notifikasi
 }
 ```
 
-### 7. Group Buy Module (Patungan Panen) ✅
+### 8. Group Buy Module (Patungan Panen) ✅
 
 #### GET /api/v1/group-buy
 Mendapatkan daftar kampanye patungan aktif (Publik)

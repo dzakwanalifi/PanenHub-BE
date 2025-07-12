@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../../core/supabaseClient';
 import { createTripayTransaction } from '../payments/payments.service';
-import { sendNotificationToUser } from '../notifications/notifications.service';
+// import { sendNotificationToUser } from '../notifications/notifications.service';
 
 // Validation schemas
 const createCampaignSchema = z.object({
@@ -280,13 +280,13 @@ export const joinCampaign = async (req: Request, res: Response) => {
             .eq('id', participant.id);
 
         // Send notification to user
-        await sendNotificationToUser(userId, {
-            title: 'Berhasil Bergabung Patungan',
-            body: 'Silakan selesaikan pembayaran untuk mengikuti patungan',
-            data: {
-                url: `/group-buy/${campaignId}`
-            }
-        });
+        // await sendNotificationToUser(userId, {
+        //     title: 'Berhasil Bergabung Patungan',
+        //     body: 'Silakan selesaikan pembayaran untuk mengikuti patungan',
+        //     data: {
+        //         url: `/group-buy/${campaignId}`
+        //     }
+        // });
 
         res.status(201).json({
             message: 'Successfully joined the campaign',
