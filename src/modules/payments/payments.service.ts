@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import 'dotenv/config';
+import { Request, Response } from 'express'; // Added Request and Response imports
+import { supabase } from '../../core/supabaseClient'; // Added supabase import
 
 interface TripayTransactionData {
   merchant_ref: string;
@@ -85,4 +87,49 @@ export const validateTripayWebhook = (payload: any, signature: string): { valid:
     .digest('hex');
 
   return { valid: signature === expectedSignature };
+}; 
+
+export const handleTripayWebhook = async (req: Request, res: Response) => {
+    try {
+        const { reference, merchant_ref, status } = req.body;
+
+        // Handle group buy payments
+        if (merchant_ref.startsWith('GB-')) {
+            const participantId = merchant_ref.replace('GB-', '');
+            
+            if (status === 'PAID') {
+                // Get participant details
+                const { data: participant, error: participantError } = await supabase
+                    .from('group_buy_participants')
+                    .select('campaign_id, quantity')
+                    .eq('id', participantId)
+                    .single();
+
+                if (participantError || !participant) {
+                    throw new Error('Participant not found');
+                }
+
+                // Update participant payment status
+                await supabase
+                    .from('group_buy_participants')
+                    .update({ payment_status: 'paid' })
+                    .eq('id', participantId);
+
+                // Update campaign current quantity
+                await supabase.rpc('increment_campaign_quantity', {
+                    p_campaign_id: participant.campaign_id,
+                    p_quantity: participant.quantity
+                });
+
+                return res.json({ success: true });
+            }
+        }
+
+        // Handle regular order payments
+        // ... existing order payment handling code ...
+
+    } catch (error: any) {
+        console.error('Webhook error:', error);
+        res.status(500).json({ error: error.message });
+    }
 }; 

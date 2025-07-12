@@ -237,6 +237,194 @@ Endpoint untuk testing pengiriman notifikasi
 }
 ```
 
+### 6. Group Buy Module (Patungan Panen)
+
+#### GET /api/v1/group-buy
+Mendapatkan daftar kampanye patungan aktif (Publik)
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "product": {
+      "id": "uuid",
+      "title": "Tomat Segar",
+      "description": "Tomat segar dari petani lokal"
+    },
+    "store": {
+      "id": "uuid",
+      "name": "Toko Sayur Segar",
+      "image_url": "https://..."
+    },
+    "group_price": 12000,
+    "target_quantity": 100,
+    "current_quantity": 45,
+    "start_date": "2024-03-01T00:00:00Z",
+    "end_date": "2024-03-20T00:00:00Z",
+    "status": "active"
+  }
+]
+```
+
+#### GET /api/v1/group-buy/:id
+Mendapatkan detail kampanye patungan (Publik)
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "product": {
+    "id": "uuid",
+    "title": "Tomat Segar",
+    "description": "Tomat segar dari petani lokal"
+  },
+  "store": {
+    "id": "uuid",
+    "name": "Toko Sayur Segar",
+    "image_url": "https://..."
+  },
+  "group_price": 12000,
+  "target_quantity": 100,
+  "current_quantity": 45,
+  "start_date": "2024-03-01T00:00:00Z",
+  "end_date": "2024-03-20T00:00:00Z",
+  "status": "active",
+  "participants": [
+    {
+      "id": "uuid",
+      "quantity": 5,
+      "payment_status": "paid",
+      "created_at": "2024-03-01T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### POST /api/v1/group-buy
+Membuat kampanye patungan baru (Dilindungi - Hanya pemilik toko)
+
+**Request Body:**
+```json
+{
+  "product_id": "uuid",
+  "store_id": "uuid",
+  "group_price": 12000,
+  "target_quantity": 100,
+  "end_date": "2024-03-20T00:00:00Z"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Campaign created successfully",
+  "campaign": {
+    "id": "uuid",
+    "product_id": "uuid",
+    "store_id": "uuid",
+    "group_price": 12000,
+    "target_quantity": 100,
+    "current_quantity": 0,
+    "start_date": "2024-03-01T00:00:00Z",
+    "end_date": "2024-03-20T00:00:00Z",
+    "status": "active"
+  }
+}
+```
+
+#### PUT /api/v1/group-buy/:id
+Mengupdate kampanye patungan (Dilindungi - Hanya pemilik toko)
+
+**Request Body (parsial):**
+```json
+{
+  "group_price": 11500,
+  "end_date": "2024-03-22T00:00:00Z"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Campaign updated successfully",
+  "campaign": {
+    "id": "uuid",
+    "product_id": "uuid",
+    "store_id": "uuid",
+    "group_price": 11500,
+    "target_quantity": 100,
+    "current_quantity": 45,
+    "start_date": "2024-03-01T00:00:00Z",
+    "end_date": "2024-03-22T00:00:00Z",
+    "status": "active"
+  }
+}
+```
+
+#### DELETE /api/v1/group-buy/:id
+Menghapus kampanye patungan (Dilindungi - Hanya pemilik toko)
+
+**Response:**
+```json
+{
+  "message": "Campaign deleted successfully"
+}
+```
+
+#### POST /api/v1/group-buy/:id/join
+Bergabung dengan kampanye patungan (Dilindungi)
+
+**Request Body:**
+```json
+{
+  "quantity": 5,
+  "payment_method": "QRIS"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Successfully joined the campaign",
+  "payment_details": {
+    "reference": "T123456789",
+    "checkout_url": "https://tripay.co.id/checkout/T123456789",
+    "qr_string": "00020101021226..."
+  }
+}
+```
+
+### Flow Patungan Panen
+
+1. **Membuat Kampanye:**
+   - Pemilik toko login dan dapatkan token
+   - POST `/api/group-buy` dengan detail kampanye
+   - Kampanye dibuat dengan status "active"
+
+2. **Bergabung Kampanye:**
+   - User login dan dapatkan token
+   - POST `/api/group-buy/:id/join` dengan jumlah yang diinginkan
+   - Sistem membuat record partisipasi dan link pembayaran
+   - User melakukan pembayaran melalui TriPay
+
+3. **Proses Pembayaran:**
+   - TriPay mengirim webhook ke `/api/payments/webhook`
+   - Sistem memvalidasi pembayaran
+   - Jika sukses:
+     - Update status pembayaran participant
+     - Update current_quantity kampanye
+     - Kirim notifikasi ke participant
+
+4. **Penyelesaian Kampanye:**
+   - Sistem secara otomatis mengecek kampanye yang berakhir
+   - Jika target tercapai:
+     - Buat pesanan untuk semua participant
+     - Kirim notifikasi sukses
+   - Jika gagal:
+     - Proses refund untuk semua participant
+     - Kirim notifikasi kegagalan
+
 ## Flow Aplikasi
 
 ### 1. Membuat Toko
