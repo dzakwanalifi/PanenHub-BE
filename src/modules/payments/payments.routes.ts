@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import { validateTripayWebhook, createTripayTransaction } from './payments.service';
 import { supabase } from '../../core/supabaseClient';
+import { sendNotificationToUsers } from '../notifications/notifications.service';
 
 const router = Router();
 
+interface OrderWithStore {
+    stores: {
+        owner_id: string;
+    }[];
+}
+
 router.post('/webhook', async (req, res) => {
     const signature = (req.headers['x-callback-signature'] || req.headers['X-Callback-Signature']) as string;
-
-
 
     const validation = validateTripayWebhook(req.body, signature);
     
@@ -22,11 +27,27 @@ router.post('/webhook', async (req, res) => {
 
     try {
         if (status === 'PAID') {
-            // Log pembayaran berhasil - sementara tanpa RPC
-            console.log(`Payment successful for merchant_ref: ${merchant_ref}`);
-            console.log('Payment data:', req.body);
-            
-            // TODO: Implementasi update database setelah SQL functions siap
+            // Get all seller IDs from orders that were just paid
+            const { data: orders, error: orderError } = await supabase
+                .from('orders')
+                .select('stores(owner_id)')
+                .eq('checkout_session_id', merchant_ref);
+
+            if (orderError) throw orderError;
+
+            // Get unique seller IDs
+            const sellerIds = [...new Set((orders as OrderWithStore[] || []).flatMap(o => o.stores.map(s => s.owner_id)))];
+
+            // Send notification to each seller
+            if (sellerIds.length > 0) {
+                await sendNotificationToUsers(sellerIds, {
+                    title: 'Pesanan Baru Diterima! 🎉',
+                    body: 'Anda baru saja menerima pesanan baru. Segera periksa dashboard Anda!',
+                    data: { url: '/dashboard/orders' }
+                });
+            }
+
+            // TODO: Implement database update after SQL functions are ready
             // const { error } = await supabase.rpc('handle_successful_payment', {
             //     p_checkout_session_id: merchant_ref
             // });

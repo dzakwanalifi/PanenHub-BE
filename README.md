@@ -92,6 +92,10 @@ Server akan berjalan di `http://localhost:8000`
 - `POST /api/payments/webhook` - Webhook TriPay
 - `GET /api/payments/status` - Status modul pembayaran
 
+### Notifications Module
+- `POST /api/v1/notifications/subscribe` - Subscribe to push notifications (requires auth)
+- `DELETE /api/v1/notifications/unsubscribe` - Unsubscribe from push notifications (requires auth)
+
 ## 🔐 Authentication
 
 Aplikasi menggunakan Supabase untuk otentikasi. Token JWT dari Supabase digunakan untuk mengakses endpoint yang memerlukan autentikasi.
