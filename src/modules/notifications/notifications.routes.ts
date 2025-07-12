@@ -2,9 +2,58 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authMiddleware } from '../../core/middleware/auth.middleware';
 import { supabase } from '../../core/supabaseClient';
+import { sendNotificationToUser } from './notifications.service';
 import webpush from 'web-push';
 
 const router = Router();
+
+// Middleware sederhana untuk melindungi endpoint internal
+const internalAuthMiddleware = (req: any, res: any, next: any) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token === process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        next();
+    } else {
+        res.status(401).json({ message: 'Unauthorized' });
+    }
+};
+
+// Schema for internal notification payload
+const internalNotificationSchema = z.object({
+  userId: z.string(),
+  payload: z.object({
+    title: z.string(),
+    body: z.string(),
+    data: z.object({
+      url: z.string()
+    }).optional()
+  })
+});
+
+// Internal endpoint untuk menerima notifikasi dari Edge Functions
+router.post('/send-internal', internalAuthMiddleware, async (req, res) => {
+    try {
+        const validation = internalNotificationSchema.safeParse(req.body);
+        if (!validation.success) {
+            return res.status(400).json({ 
+                message: 'Invalid payload', 
+                errors: validation.error.errors 
+            });
+        }
+        
+        const { userId, payload } = validation.data;
+        
+        // Kirim notifikasi menggunakan service yang sudah ada
+        await sendNotificationToUser(userId, payload);
+        
+        res.status(200).json({ message: 'Notification sent successfully' });
+    } catch (error: any) {
+        console.error('Internal notification error:', error);
+        res.status(500).json({ 
+            message: 'Failed to send notification', 
+            error: error.message 
+        });
+    }
+});
 
 // Schema for subscription token
 const subscribeSchema = z.object({

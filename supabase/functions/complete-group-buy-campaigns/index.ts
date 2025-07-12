@@ -1,10 +1,12 @@
+/// <reference path="../_shared/deno.d.ts" />
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '../_shared/database.types';
 
 // Initialize Supabase client
+// @ts-ignore - Deno is available in Deno runtime
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+// @ts-ignore - Deno is available in Deno runtime
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const supabase = createClient<Database>(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function handleSuccessfulCampaign(campaignId: string) {
     const { data: campaign } = await supabase
@@ -59,72 +61,64 @@ async function handleSuccessfulCampaign(campaignId: string) {
             .update({ order_id: order.id })
             .eq('id', participant.id);
 
-        // Send notification to participant
-        await fetch(`${supabaseUrl}/rest/v1/rpc/send_notification`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({
-                user_id: participant.user_id,
-                title: 'Patungan Berhasil!',
-                body: 'Patungan telah mencapai target. Pesanan Anda akan segera diproses.',
-                data: {
-                    type: 'group_buy_success',
-                    campaign_id: campaignId,
-                    order_id: order.id
+        // Send notification to the participant about the success
+        await supabase.functions.invoke('send-notification', {
+            body: {
+                userId: participant.user_id,
+                payload: {
+                    title: 'Patungan Berhasil! 🎉',
+                    body: 'Patungan telah mencapai target. Pesanan Anda akan segera diproses oleh penjual.',
+                    data: {
+                        url: `/transaksi/${order.id}` // Sertakan URL ke detail pesanan
+                    }
                 }
-            })
+            }
         });
     }
 }
 
 async function handleFailedCampaign(campaignId: string) {
-    // Update campaign status
+    // Update campaign status to 'failed'
     await supabase
         .from('group_buy_campaigns')
         .update({ status: 'failed' })
         .eq('id', campaignId);
 
-    // Get all paid participants
+    // Get all paid participants to notify and update
     const { data: participants } = await supabase
         .from('group_buy_participants')
-        .select('*')
+        .select('id, user_id') // Hanya butuh id dan user_id
         .eq('campaign_id', campaignId)
         .eq('payment_status', 'paid');
 
-    if (!participants) return;
+    if (!participants || participants.length === 0) return;
 
+    // Proses setiap partisipan
     for (const participant of participants) {
-        // Update participant status to refunded
+        // 1. Update participant payment_status to 'refunded'
         await supabase
             .from('group_buy_participants')
             .update({ payment_status: 'refunded' })
             .eq('id', participant.id);
 
-        // Send notification about refund
-        await fetch(`${supabaseUrl}/rest/v1/rpc/send_notification`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`,
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({
-                user_id: participant.user_id,
-                title: 'Patungan Gagal',
-                body: 'Patungan tidak mencapai target. Dana Anda akan segera dikembalikan.',
-                data: {
-                    type: 'group_buy_failed',
-                    campaign_id: campaignId
+        // 2. Send notification about the refund
+        // Memanggil Edge Function send-notification yang akan kita buat
+        await supabase.functions.invoke('send-notification', {
+            body: {
+                userId: participant.user_id,
+                payload: {
+                    title: 'Patungan Gagal 🙁',
+                    body: 'Patungan tidak mencapai target. Dana Anda akan segera kami proses untuk pengembalian.',
+                    data: {
+                        url: '/patungan'
+                    }
                 }
-            })
+            }
         });
     }
 }
 
+// @ts-ignore - Deno is available in Deno runtime
 Deno.serve(async (req) => {
     try {
         // Find expired active campaigns

@@ -24,7 +24,12 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.error('Supabase auth error:', error?.message);
+      // Use structured logging if available, fallback to console
+      if (req.log) {
+        req.log.error({ error: error?.message }, 'Supabase auth error');
+      } else {
+        console.error('Supabase auth error:', error?.message);
+      }
       return res.status(401).json({ message: `Unauthorized: ${error?.message || 'Invalid token'}` });
     }
 

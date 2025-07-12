@@ -51,24 +51,40 @@ describe('Products API - /api/v1/products', () => {
 
   // Test Case 1: Berhasil mendapatkan semua produk (public endpoint)
   it('should get all products successfully', async () => {
-    // Mock database operations
-    const mockFrom = jest.fn();
-    const mockSelect = jest.fn();
+    // Mock complex query builder for GET products endpoint
+    const mockQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      range: jest.fn().mockResolvedValue({
+        data: [mockProduct],
+        error: null,
+      }),
+    };
 
-    (supabase.from as jest.Mock).mockReturnValue({
-      select: mockSelect,
-    });
+    // Mock for count query
+    const mockCountBuilder = {
+      select: jest.fn().mockResolvedValue({
+        count: 1,
+        error: null,
+      }),
+    };
 
-    mockSelect.mockResolvedValue({
-      data: [mockProduct],
-      error: null,
+    let callCount = 0;
+    (supabase.from as jest.Mock).mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return mockQueryBuilder; // Main query
+      } else {
+        return mockCountBuilder; // Count query
+      }
     });
 
     const response = await request(app)
       .get('/api/v1/products');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual([mockProduct]);
+    expect(response.body.data).toEqual([mockProduct]);
+    expect(response.body.pagination).toBeDefined();
   });
 
   // Test Case 2: Berhasil mendapatkan detail produk (public endpoint)
@@ -158,11 +174,23 @@ describe('Products API - /api/v1/products', () => {
       error: null,
     });
 
+    // Mock store verification first (for middleware)
+    (supabase.from as jest.Mock).mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({
+            data: mockStore,
+            error: null,
+          }),
+        }),
+      }),
+    });
+
     const response = await request(app)
       .post('/api/v1/products')
       .set('Authorization', 'Bearer valid-token')
       .send({
-        store_id: 'invalid-uuid',
+        store_id: '550e8400-e29b-41d4-a716-446655440001',
         title: '', // Invalid: empty title
         price: -100, // Invalid: negative price
       });
@@ -277,7 +305,7 @@ describe('Products API - /api/v1/products', () => {
       });
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe('Forbidden');
+    expect(response.body.message).toBe('Forbidden: Not the store owner');
   });
 
   // Test Case 8: Berhasil update produk
@@ -288,33 +316,26 @@ describe('Products API - /api/v1/products', () => {
       error: null,
     });
 
-    // Mock database operations
-    const mockFrom = jest.fn();
-    const mockSelect = jest.fn();
-    const mockUpdate = jest.fn();
-    const mockEq = jest.fn();
-    const mockSingle = jest.fn();
-
-    // Mock database operations - simplified approach
+    // Mock database operations for new authorization middleware
     let callCount = 0;
     (supabase.from as jest.Mock).mockImplementation((tableName: string) => {
       callCount++;
       
       if (tableName === 'products') {
         if (callCount === 1) {
-          // First call: get product for verification
+          // First call: authorization middleware check
           return {
             select: jest.fn().mockReturnValue({
               eq: jest.fn().mockReturnValue({
                 single: jest.fn().mockResolvedValue({
-                  data: mockProduct,
+                  data: { stores: { owner_id: mockUser.id } },
                   error: null,
                 }),
               }),
             }),
           };
-        } else if (callCount === 3) {
-          // Third call: update product
+        } else {
+          // Second call: actual update
           return {
             update: jest.fn().mockReturnValue({
               eq: jest.fn().mockReturnValue({
@@ -328,18 +349,6 @@ describe('Products API - /api/v1/products', () => {
             }),
           };
         }
-      } else if (tableName === 'stores') {
-        // Second call: get store for verification
-        return {
-          select: jest.fn().mockReturnValue({
-            eq: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({
-                data: mockStore,
-                error: null,
-              }),
-            }),
-          }),
-        };
       }
 
       return {
@@ -368,54 +377,41 @@ describe('Products API - /api/v1/products', () => {
       error: null,
     });
 
-    // Mock database operations
-    const mockFrom = jest.fn();
-    const mockSelect = jest.fn();
-    const mockDelete = jest.fn();
-    const mockEq = jest.fn();
-    const mockSingle = jest.fn();
-
+    // Mock database operations for new authorization middleware
+    let callCount = 0;
     (supabase.from as jest.Mock).mockImplementation((tableName: string) => {
-      const baseOperations = {
-        select: mockSelect,
-        delete: mockDelete,
-      };
-
+      callCount++;
+      
       if (tableName === 'products') {
-        // First call: get product
-        mockSelect.mockReturnValueOnce({
-          eq: mockEq,
-        });
-        mockEq.mockReturnValueOnce({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValueOnce({
-          data: mockProduct,
-          error: null,
-        });
-
-        // Second call: delete product
-        mockDelete.mockReturnValue({
-          eq: mockEq,
-        });
-        mockEq.mockResolvedValue({
-          data: null,
-          error: null,
-        });
-      } else if (tableName === 'stores') {
-        mockSelect.mockReturnValue({
-          eq: mockEq,
-        });
-        mockEq.mockReturnValue({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValue({
-          data: mockStore,
-          error: null,
-        });
+        if (callCount === 1) {
+          // First call: authorization middleware check
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({
+                  data: { stores: { owner_id: mockUser.id } },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        } else {
+          // Second call: actual delete
+          return {
+            delete: jest.fn().mockReturnValue({
+              eq: jest.fn().mockResolvedValue({
+                data: null,
+                error: null,
+              }),
+            }),
+          };
+        }
       }
 
-      return baseOperations;
+      return {
+        select: jest.fn(),
+        delete: jest.fn(),
+      };
     });
 
     const response = await request(app)

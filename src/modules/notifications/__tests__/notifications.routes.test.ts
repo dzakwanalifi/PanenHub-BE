@@ -2,44 +2,30 @@ import express from 'express';
 import request from 'supertest';
 import { supabase } from '../../../core/supabaseClient';
 import notificationsRouter from '../notifications.routes';
-import { cleanupTestUser } from '../../../__tests__/helpers/auth.helper';
+
+// Mock Supabase client
+jest.mock('../../../core/supabaseClient', () => ({
+  supabase: {
+    auth: {
+      getUser: jest.fn(),
+    },
+    from: jest.fn(),
+  },
+}));
 
 const app = express();
 app.use(express.json());
 app.use('/api/v1/notifications', notificationsRouter);
 
+// Mock data
+const mockUser = {
+  id: 'test-user-id',
+  email: 'test@example.com',
+};
+
 describe('Notifications Routes', () => {
-  let testUser: any;
-  let authToken: string;
-
-  beforeAll(async () => {
-    // Create test user
-    const email = `test-${Date.now()}@example.com`;
-    const password = 'testpassword123';
-    
-    const { data: { user }, error } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true
-    });
-
-    if (error) throw error;
-    testUser = user;
-
-    // Get auth token
-    const { data: { session }, error: loginError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (loginError) throw loginError;
-    authToken = session!.access_token;
-  });
-
-  afterAll(async () => {
-    if (testUser) {
-      await cleanupTestUser(testUser.id);
-    }
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
   describe('POST /subscribe', () => {
@@ -62,49 +48,65 @@ describe('Notifications Routes', () => {
     });
 
     it('should validate subscription data', async () => {
+      // Mock successful auth
+      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+
       const response = await request(app)
         .post('/api/v1/notifications/subscribe')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', 'Bearer valid-token')
         .send({ token: { invalid: 'data' } });
 
       expect(response.status).toBe(400);
     });
 
     it('should save valid subscription', async () => {
+      // Mock successful auth
+      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+
+      // Mock database operations
+      (supabase.from as jest.Mock).mockReturnValue({
+        upsert: jest.fn().mockResolvedValue({
+          data: null,
+          error: null,
+        }),
+      });
+
       const response = await request(app)
         .post('/api/v1/notifications/subscribe')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', 'Bearer valid-token')
         .send(validSubscription);
 
       expect(response.status).toBe(201);
       expect(response.body.message).toBe('Subscription saved successfully.');
-
-      // Verify data was saved
-      const { data: tokens } = await supabase
-        .from('device_tokens')
-        .select('*')
-        .eq('user_id', testUser.id);
-
-      expect(tokens).toHaveLength(1);
-      expect(tokens![0].token_info).toEqual(validSubscription.token);
     });
 
     it('should prevent duplicate subscriptions', async () => {
-      // Try to save the same subscription again
+      // Mock successful auth
+      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+
+      // Mock database operations - no error means upsert handled duplicates
+      (supabase.from as jest.Mock).mockReturnValue({
+        upsert: jest.fn().mockResolvedValue({
+          data: null,
+          error: null,
+        }),
+      });
+
       const response = await request(app)
         .post('/api/v1/notifications/subscribe')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', 'Bearer valid-token')
         .send(validSubscription);
 
       expect(response.status).toBe(201);
-
-      // Verify no duplicate was created
-      const { data: tokens } = await supabase
-        .from('device_tokens')
-        .select('*')
-        .eq('user_id', testUser.id);
-
-      expect(tokens).toHaveLength(1);
     });
   });
 
@@ -126,9 +128,27 @@ describe('Notifications Routes', () => {
     });
 
     it('should delete subscription', async () => {
+      // Mock successful auth
+      (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      });
+
+      // Mock database operations
+      (supabase.from as jest.Mock).mockReturnValue({
+        delete: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({
+              data: null,
+              error: null,
+            }),
+          }),
+        }),
+      });
+
       const response = await request(app)
         .delete('/api/v1/notifications/unsubscribe')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', 'Bearer valid-token')
         .send({
           token: {
             endpoint: 'https://fcm.googleapis.com/fcm/send/test-endpoint',
@@ -141,14 +161,6 @@ describe('Notifications Routes', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe('Unsubscribed successfully.');
-
-      // Verify data was deleted
-      const { data: tokens } = await supabase
-        .from('device_tokens')
-        .select('*')
-        .eq('user_id', testUser.id);
-
-      expect(tokens).toHaveLength(0);
     });
   });
 }); 

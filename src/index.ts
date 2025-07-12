@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
+import pino from 'pino-http';
 
 // Import routers
 import authRoutes from './modules/auth/auth.routes';
@@ -14,8 +15,21 @@ import groupBuyRoutes from './modules/groupbuy/groupbuy.routes';
 const app = express();
 const port = process.env.PORT || 8080;
 
+// Setup logger
+const logger = pino({
+    transport: process.env.NODE_ENV !== 'production' 
+        ? { target: 'pino-pretty' } 
+        : undefined,
+});
+app.use(logger);
+
 app.use(cors());
 app.use(express.json());
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
 
 // Register all routers
 app.use('/api/v1/auth', authRoutes);

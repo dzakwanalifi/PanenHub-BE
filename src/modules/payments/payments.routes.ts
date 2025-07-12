@@ -27,6 +27,19 @@ router.post('/webhook', async (req, res) => {
 
     try {
         if (status === 'PAID') {
+            // Update database terlebih dahulu untuk memastikan konsistensi
+            const { error: rpcError } = await supabase.rpc('handle_successful_payment', {
+                p_checkout_session_id: merchant_ref
+            });
+
+            // Jika update database gagal, hentikan proses dan catat error
+            if (rpcError) {
+                console.error('Error calling handle_successful_payment RPC:', rpcError);
+                // Penting untuk tidak melempar error ke TriPay agar tidak terjadi pengiriman ulang
+                // Cukup kirim response error ke log monitoring Anda
+                return res.status(500).json({ success: false, message: 'Failed to process successful payment in DB' });
+            }
+
             // Get all seller IDs from orders that were just paid
             const { data: orders, error: orderError } = await supabase
                 .from('orders')
@@ -46,12 +59,19 @@ router.post('/webhook', async (req, res) => {
                     data: { url: '/dashboard/orders' }
                 });
             }
+        } else if (status === 'FAILED' || status === 'EXPIRED') {
+            // Panggil RPC untuk menangani pembayaran yang gagal atau kedaluwarsa
+            const { error: rpcError } = await supabase.rpc('handle_failed_payment', {
+                p_checkout_session_id: merchant_ref
+            });
 
-            // TODO: Implement database update after SQL functions are ready
-            // const { error } = await supabase.rpc('handle_successful_payment', {
-            //     p_checkout_session_id: merchant_ref
-            // });
-            // if (error) throw error;
+            if (rpcError) {
+                console.error('Error calling handle_failed_payment RPC:', rpcError);
+                return res.status(500).json({ success: false, message: 'Failed to process failed payment in DB' });
+            }
+            
+            // Anda bisa menambahkan notifikasi kepada pengguna bahwa pembayaran mereka gagal
+            console.log(`Payment ${status.toLowerCase()} for checkout session: ${merchant_ref}`);
         }
         
         res.status(200).json({ 
