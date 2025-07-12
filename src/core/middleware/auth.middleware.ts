@@ -20,19 +20,25 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
   const token = authHeader.split(' ')[1];
 
   try {
+    // Use Supabase's built-in getUser method to validate the token
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
-    if (error) {
-      return res.status(401).json({ message: `Unauthorized: ${error.message}` });
-    }
-    if (!user) {
-      return res.status(401).json({ message: 'Unauthorized: Invalid token' });
+    if (error || !user) {
+      console.error('Supabase auth error:', error?.message);
+      return res.status(401).json({ message: `Unauthorized: ${error?.message || 'Invalid token'}` });
     }
 
-    // Lampirkan data pengguna ke request untuk digunakan oleh endpoint selanjutnya
-    req.user = user;
+    // Attach the user information to the request
+    req.user = {
+      id: user.id,
+      email: user.email,
+      role: user.role || 'authenticated'
+    };
+
     next();
   } catch (err) {
-    return res.status(500).json({ message: 'Internal server error' });
+    const error = err as Error;
+    console.error('Auth middleware error:', error.message);
+    return res.status(401).json({ message: `Unauthorized: ${error.message}` });
   }
 }; 
