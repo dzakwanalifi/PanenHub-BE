@@ -9,103 +9,47 @@ router.post('/create_from_cart', authMiddleware, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // 1. Ambil keranjang dan item-itemnya
+    // 1. Ambil keranjang & item-itemnya
     const { data: cart, error: cartError } = await supabase
       .from('carts')
-      .select('id, cart_items(*, products(*, stores(id, store_name)))')
+      .select('id, cart_items(*, products(*))') // Ambil data produk
       .eq('user_id', userId)
       .single();
 
     if (cartError || !cart || cart.cart_items.length === 0) {
-      return res.status(400).json({ message: 'Cart is empty or not found.' });
+      return res.status(400).json({ message: 'Keranjang kosong atau tidak ditemukan.' });
     }
 
-    // 2. Kelompokkan item per toko dan hitung total
-    let grandTotal = 0;
-    const ordersByStore: { [storeId: string]: any } = {};
+    // 2. Panggil fungsi RPC untuk membuat pesanan dan sesi checkout
+    const { data: session, error: rpcError } = await supabase.rpc('create_orders_from_cart', {
+        p_user_id: userId,
+        p_cart_id: cart.id
+    }).single();
 
-    for (const item of cart.cart_items) {
-      const storeId = item.products.stores.id;
-      const itemTotal = item.products.price * item.quantity;
-      grandTotal += itemTotal;
+    if (rpcError) throw rpcError;
 
-      if (!ordersByStore[storeId]) {
-        ordersByStore[storeId] = {
-          store_id: storeId,
-          total_amount: 0,
-          items: [],
-        };
-      }
-      ordersByStore[storeId].total_amount += itemTotal;
-      ordersByStore[storeId].items.push({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price_at_purchase: item.products.price,
-      });
-    }
-
-    // 3. Buat satu sesi checkout
-    const { data: session, error: sessionError } = await supabase
-      .from('checkout_sessions')
-      .insert({ user_id: userId, total_amount: grandTotal })
-      .select()
-      .single();
-    
-    if (sessionError) throw sessionError;
-
-    // 4. Buat pesanan untuk setiap toko
-    for (const storeId in ordersByStore) {
-        const orderData = ordersByStore[storeId];
-        const { data: newOrder, error: orderError } = await supabase
-            .from('orders')
-            .insert({
-                checkout_session_id: session.id,
-                buyer_id: userId,
-                store_id: orderData.store_id,
-                total_amount: orderData.total_amount,
-            })
-            .select()
-            .single();
-
-        if (orderError) throw orderError;
-        
-        // 5. Masukkan item-item pesanan
-        const orderItemsToInsert = orderData.items.map((item: any) => ({
-            ...item,
-            order_id: newOrder.id,
-        }));
-        const { error: orderItemsError } = await supabase.from('order_items').insert(orderItemsToInsert);
-        if (orderItemsError) throw orderItemsError;
-    }
-
-    // 6. Panggil modul pembayaran untuk membuat link pembayaran
+    // 3. Panggil modul pembayaran untuk membuat link pembayaran
     const paymentData = await createTripayTransaction({
-        merchant_ref: session.id, // Gunakan ID sesi checkout sebagai referensi
-        amount: grandTotal,
-        customer_name: req.user.email, // Ganti dengan nama jika ada
+        merchant_ref: (session as any).checkout_session_id,
+        amount: (session as any).total_amount,
+        customer_name: req.user.email,
         customer_email: req.user.email,
-        order_items: cart.cart_items.map((i: any) => ({
-            sku: i.product_id,
+        order_items: cart.cart_items.map(i => ({
+            sku: i.products.id,
             name: i.products.title,
             price: i.products.price,
             quantity: i.quantity,
         })),
-        method: req.body.payment_method || 'QRIS', // Ambil metode pembayaran dari request body
+        method: req.body.payment_method || 'QRIS',
     });
 
-    // 7. Kosongkan keranjang pengguna
-    await supabase.from('cart_items').delete().eq('cart_id', cart.id);
-
-    // 8. Kirim URL pembayaran ke frontend
     res.status(201).json({
-        message: 'Order created successfully',
-        checkout_session_id: session.id,
+        message: 'Pesanan berhasil dibuat',
         payment_details: paymentData,
     });
 
   } catch (error: any) {
-    console.error('Error creating order:', error);
-    res.status(500).json({ message: 'Failed to create order', error: error.message });
+    res.status(500).json({ message: 'Gagal membuat pesanan', error: error.message });
   }
 });
 

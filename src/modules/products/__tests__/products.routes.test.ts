@@ -132,7 +132,7 @@ describe('Products API - /api/v1/products', () => {
       .get('/api/v1/products/non-existent-id');
 
     expect(response.status).toBe(404);
-    expect(response.body.message).toBe('Product not found');
+    expect(response.body.message).toBe('Produk tidak ditemukan');
   });
 
   // Test Case 4: Gagal membuat produk tanpa otentikasi

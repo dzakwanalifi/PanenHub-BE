@@ -8,11 +8,11 @@ const router = Router();
 // Endpoint untuk mendapatkan semua produk (Publik)
 router.get('/', async (req, res) => {
     try {
-        const { data, error } = await supabase.from('products').select('*');
+        const { data, error } = await supabase.from('products').select('*, stores(store_name)');
         if (error) throw error;
         res.status(200).json(data);
     } catch (error: any) {
-        res.status(500).json({ message: "Failed to fetch products", error: error.message });
+        res.status(500).json({ message: "Gagal mengambil data produk", error: error.message });
     }
 });
 
@@ -20,13 +20,11 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { data, error } = await supabase.from('products').select('*').eq('id', id).single();
-        if (error || !data) {
-            return res.status(404).json({ message: 'Product not found' });
-        }
+        const { data, error } = await supabase.from('products').select('*, stores(store_name, owner_id)').eq('id', id).single();
+        if (error || !data) return res.status(404).json({ message: 'Produk tidak ditemukan' });
         res.status(200).json(data);
     } catch (error: any) {
-        res.status(500).json({ message: "Failed to fetch product", error: error.message });
+        res.status(500).json({ message: "Gagal mengambil data produk", error: error.message });
     }
 });
 

@@ -8,6 +8,7 @@ module.exports = {
   verbose: true,
   forceExit: true, // Memaksa Jest keluar setelah test selesai
   clearMocks: true,
+  testTimeout: 30000, // 30 detik untuk integration tests
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },

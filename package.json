@@ -9,6 +9,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:unit": "jest --testNamePattern='(?!Integration)'",
+    "test:integration": "jest --testNamePattern='Integration'",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"
   },

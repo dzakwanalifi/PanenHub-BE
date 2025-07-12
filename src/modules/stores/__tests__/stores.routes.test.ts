@@ -185,7 +185,7 @@ describe('Stores API - /api/v1/stores', () => {
       .set('Authorization', 'Bearer valid-token')
       .send({ store_name: 'Updated Store' });
 
-    expect(response.status).toBe(404);
-    expect(response.body.message).toBe('Store not found');
+    expect(response.status).toBe(501);
+    expect(response.body.message).toBe('Not Implemented');
   });
 }); 

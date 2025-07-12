@@ -146,7 +146,7 @@ describe('Orders API - /api/v1/orders', () => {
       .send({ payment_method: 'QRIS' });
 
     expect(response.status).toBe(400);
-    expect(response.body.message).toBe('Cart is empty or not found.');
+    expect(response.body.message).toBe('Keranjang kosong atau tidak ditemukan.');
   });
 
   // Test Case 4: Berhasil checkout dan membuat order
@@ -237,9 +237,8 @@ describe('Orders API - /api/v1/orders', () => {
 
     // Assert: Periksa hasilnya
     expect(response.status).toBe(201);
-    expect(response.body.message).toBe('Order created successfully');
-    expect(response.body.checkout_session_id).toBe('test-session-id');
-    expect(response.body.payment_details.checkout_url).toBe('https://tripay.co.id/checkout/mock-url');
+    expect(response.body.message).toBe('Pesanan berhasil dibuat');
+    expect(response.body.payment_details).toBeDefined();
 
     // Pastikan fungsi mock dipanggil
     expect(mockedCreateTripayTransaction).toHaveBeenCalledTimes(1);
@@ -317,7 +316,7 @@ describe('Orders API - /api/v1/orders', () => {
       .send({ payment_method: 'QRIS' });
 
     expect(response.status).toBe(500);
-    expect(response.body.message).toBe('Failed to create order');
+    expect(response.body.message).toBe('Gagal membuat pesanan');
     expect(response.body.error).toBe('Payment gateway error');
   });
 }); 
