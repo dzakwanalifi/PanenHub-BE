@@ -7,7 +7,7 @@ const router = Router();
 
 // Schema validasi untuk menambah item ke keranjang
 const addCartItemSchema = z.object({
-  product_id: z.string().uuid(),
+  product_id: z.string().min(1, "Product ID is required"),
   quantity: z.number().int().positive(),
 });
 
@@ -20,6 +20,7 @@ const updateCartItemSchema = z.object({
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log('Get cart for user:', userId);
 
     // Ambil keranjang dan semua item-itemnya dengan detail produk
     const { data: cart, error: cartError } = await supabase
@@ -31,7 +32,6 @@ router.get('/', authMiddleware, async (req, res) => {
           product_id,
           quantity,
           created_at,
-          updated_at,
           products (
             id,
             title,
@@ -45,25 +45,33 @@ router.get('/', authMiddleware, async (req, res) => {
         )
       `)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (cartError) {
-      // Jika keranjang belum ada, buat keranjang baru
-      if (cartError.code === 'PGRST116') {
-        const { data: newCart, error: createError } = await supabase
-          .from('carts')
-          .insert({ user_id: userId })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-
-        return res.status(200).json({
-          items: [],
-          total_price: 0
-        });
-      }
+      console.error('Cart error:', cartError);
       throw cartError;
+    }
+
+    // Jika keranjang belum ada, buat keranjang baru
+    if (!cart) {
+      console.log('Creating new cart for user:', userId);
+      
+      // Ambil atau buat keranjang menggunakan fungsi helper
+      const { data: cartId, error: cartFunctionError } = await supabase
+        .rpc('create_cart_if_not_exists', { p_user_id: userId });
+
+      if (cartFunctionError) {
+        console.error('Cart function error:', cartFunctionError);
+        throw cartFunctionError;
+      }
+
+      console.log('Cart ID from function:', cartId);
+      const cart = { id: cartId };
+
+      return res.status(200).json({
+        items: [],
+        total_price: 0
+      });
     }
 
     // Hitung total harga
@@ -77,7 +85,6 @@ router.get('/', authMiddleware, async (req, res) => {
       product_id: item.product_id,
       quantity: item.quantity,
       created_at: item.created_at,
-      updated_at: item.updated_at,
       product: {
         id: item.products.id,
         title: item.products.title,
@@ -97,9 +104,34 @@ router.get('/', authMiddleware, async (req, res) => {
 
   } catch (error: any) {
     console.error('Get cart error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
+    
+    // Handle specific Supabase errors
+    if (error.code === 'PGRST301') {
+      // JWT expired or invalid
+      return res.status(401).json({ 
+        message: 'Token expired or invalid', 
+        error: 'Authentication required' 
+      });
+    }
+    
+    if (error.code === 'PGRST116') {
+      // No rows returned - cart doesn't exist
+      return res.status(200).json({
+        items: [],
+        total_price: 0
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Gagal mengambil data keranjang', 
-      error: error.message 
+      error: error.message,
+      code: error.code 
     });
   }
 });
@@ -107,9 +139,16 @@ router.get('/', authMiddleware, async (req, res) => {
 // POST /api/v1/cart/items - Menambahkan item ke keranjang
 router.post('/items', authMiddleware, async (req, res) => {
   try {
+    console.log('Add cart item request body:', req.body);
+    console.log('User ID:', req.user.id);
+    
     const validation = addCartItemSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({ errors: validation.error.flatten() });
+      console.log('Validation error:', validation.error.flatten());
+      return res.status(400).json({ 
+        message: 'Data tidak valid',
+        errors: validation.error.flatten() 
+      });
     }
 
     const { product_id, quantity } = validation.data;
@@ -131,28 +170,17 @@ router.post('/items', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Stok tidak mencukupi' });
     }
 
-    // Ambil atau buat keranjang
-    let { data: cart, error: cartError } = await supabase
-      .from('carts')
-      .select('id')
-      .eq('user_id', userId)
-      .single();
+    // Ambil atau buat keranjang menggunakan fungsi helper
+    const { data: cartId, error: cartFunctionError } = await supabase
+      .rpc('create_cart_if_not_exists', { p_user_id: userId });
 
-    if (cartError) {
-      if (cartError.code === 'PGRST116') {
-        // Buat keranjang baru jika belum ada
-        const { data: newCart, error: createError } = await supabase
-          .from('carts')
-          .insert({ user_id: userId })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        cart = newCart;
-      } else {
-        throw cartError;
-      }
+    if (cartFunctionError) {
+      console.error('Cart function error:', cartFunctionError);
+      throw cartFunctionError;
     }
+
+    console.log('Cart ID from function:', cartId);
+    const cart = { id: cartId };
 
     // Cek apakah item sudah ada di keranjang
     const { data: existingItem, error: existingError } = await supabase
