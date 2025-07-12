@@ -14,6 +14,7 @@ jest.mock('../../../core/supabaseClient', () => ({
       getUser: jest.fn(),
     },
     from: jest.fn(),
+    rpc: jest.fn(),
   },
 }));
 
@@ -94,39 +95,9 @@ describe('Stores API - /api/v1/stores', () => {
       error: null,
     });
 
-    // Mock database operations
-    const mockFrom = jest.fn();
-    const mockInsert = jest.fn();
-    const mockUpdate = jest.fn();
-    const mockSelect = jest.fn();
-    const mockEq = jest.fn();
-    const mockSingle = jest.fn();
-
-    (supabase.from as jest.Mock).mockReturnValue({
-      insert: mockInsert,
-      update: mockUpdate,
-      select: mockSelect,
-    });
-
-    mockInsert.mockReturnValue({
-      select: mockSelect,
-    });
-
-    mockSelect.mockReturnValue({
-      single: mockSingle,
-    });
-
-    mockSingle.mockResolvedValue({
-      data: mockStore,
-      error: null,
-    });
-
-    mockUpdate.mockReturnValue({
-      eq: mockEq,
-    });
-
-    mockEq.mockResolvedValue({
-      data: null,
+    // Mock RPC call untuk create_store_and_set_seller
+    (supabase.rpc as jest.Mock).mockResolvedValue({
+      data: [mockStore],
       error: null,
     });
 
@@ -136,8 +107,8 @@ describe('Stores API - /api/v1/stores', () => {
       .send({ store_name: 'Test Store', description: 'Test Description' });
 
     expect(response.status).toBe(201);
-    expect(response.body.store_name).toBe('Test Store');
-    expect(response.body.owner_id).toBe('test-user-id');
+    expect(response.body[0].store_name).toBe('Test Store');
+    expect(response.body[0].owner_id).toBe('test-user-id');
   });
 
   // Test Case 5: Gagal update toko tanpa otentikasi

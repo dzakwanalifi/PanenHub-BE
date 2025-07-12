@@ -42,7 +42,12 @@ export const createTripayTransaction = async (data: TripayTransactionData) => {
     .digest('hex');
 
   try {
-    const response = await fetch('https://tripay.co.id/api/transaction/create', {
+    // Gunakan sandbox URL untuk development
+    const apiUrl = tripayApiKey.startsWith('DEV-') 
+      ? 'https://tripay.co.id/api-sandbox/transaction/create'
+      : 'https://tripay.co.id/api/transaction/create';
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${tripayApiKey}`,
@@ -63,17 +68,21 @@ export const createTripayTransaction = async (data: TripayTransactionData) => {
   }
 };
 
-export const validateTripayWebhook = (payload: any, signature: string): boolean => {
-  const tripayCallbackKey = process.env.TRIPAY_CALLBACK_KEY;
+export const validateTripayWebhook = (payload: any, signature: string): { valid: boolean; error?: string } => {
+  const tripayPrivateKey = process.env.TRIPAY_PRIVATE_KEY;
   
-  if (!tripayCallbackKey) {
-    throw new Error('TriPay callback key not configured');
+  if (!tripayPrivateKey) {
+    return { valid: false, error: 'TriPay private key not configured' };
+  }
+
+  if (!signature) {
+    return { valid: false, error: 'No signature provided' };
   }
 
   const expectedSignature = crypto
-    .createHmac('sha256', tripayCallbackKey)
+    .createHmac('sha256', tripayPrivateKey)
     .update(JSON.stringify(payload))
     .digest('hex');
 
-  return signature === expectedSignature;
+  return { valid: signature === expectedSignature };
 }; 

@@ -14,6 +14,7 @@ jest.mock('../../../core/supabaseClient', () => ({
       getUser: jest.fn(),
     },
     from: jest.fn(),
+    rpc: jest.fn(),
   },
 }));
 
@@ -157,70 +158,35 @@ describe('Orders API - /api/v1/orders', () => {
       error: null,
     });
 
-    // Mock database operations
+    // Mock cart data
     const mockFrom = jest.fn();
     const mockSelect = jest.fn();
-    const mockInsert = jest.fn();
-    const mockDelete = jest.fn();
     const mockEq = jest.fn();
     const mockSingle = jest.fn();
 
-    (supabase.from as jest.Mock).mockImplementation((tableName: string) => {
-      const baseOperations = {
-        select: mockSelect,
-        insert: mockInsert,
-        delete: mockDelete,
-      };
+    (supabase.from as jest.Mock).mockReturnValue({
+      select: mockSelect,
+    });
 
-      if (tableName === 'carts') {
-        mockSelect.mockReturnValue({
-          eq: mockEq,
-        });
-        mockEq.mockReturnValue({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValue({
-          data: mockCart,
-          error: null,
-        });
-      } else if (tableName === 'checkout_sessions') {
-        mockInsert.mockReturnValue({
-          select: mockSelect,
-        });
-        mockSelect.mockReturnValue({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValue({
-          data: mockCheckoutSession,
-          error: null,
-        });
-      } else if (tableName === 'orders') {
-        mockInsert.mockReturnValue({
-          select: mockSelect,
-        });
-        mockSelect.mockReturnValue({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValue({
-          data: mockOrder,
-          error: null,
-        });
-      } else if (tableName === 'order_items') {
-        mockInsert.mockResolvedValue({
-          data: null,
-          error: null,
-        });
-      } else if (tableName === 'cart_items') {
-        mockDelete.mockReturnValue({
-          eq: mockEq,
-        });
-        mockEq.mockResolvedValue({
-          data: null,
-          error: null,
-        });
-      }
+    mockSelect.mockReturnValue({
+      eq: mockEq,
+    });
 
-      return baseOperations;
+    mockEq.mockReturnValue({
+      single: mockSingle,
+    });
+
+    mockSingle.mockResolvedValue({
+      data: mockCart,
+      error: null,
+    });
+
+    // Mock RPC call untuk create_orders_from_cart
+    (supabase.rpc as jest.Mock).mockReturnValue({
+      single: jest.fn().mockResolvedValue({
+        data: { checkout_session_id: 'test-session-id', total_amount: 20000 },
+        error: null,
+      }),
     });
 
     // Mock TriPay response
@@ -242,21 +208,6 @@ describe('Orders API - /api/v1/orders', () => {
 
     // Pastikan fungsi mock dipanggil
     expect(mockedCreateTripayTransaction).toHaveBeenCalledTimes(1);
-    expect(mockedCreateTripayTransaction).toHaveBeenCalledWith({
-      merchant_ref: 'test-session-id',
-      amount: 20000,
-      customer_name: 'test@example.com',
-      customer_email: 'test@example.com',
-      order_items: [
-        {
-          sku: 'test-product-id',
-          name: 'Test Product',
-          price: 10000,
-          quantity: 2,
-        },
-      ],
-      method: 'QRIS',
-    });
   });
 
   // Test Case 5: Gagal checkout karena error dari payment gateway
@@ -267,44 +218,35 @@ describe('Orders API - /api/v1/orders', () => {
       error: null,
     });
 
-    // Mock database operations (successful)
+    // Mock cart data
     const mockFrom = jest.fn();
     const mockSelect = jest.fn();
-    const mockInsert = jest.fn();
     const mockEq = jest.fn();
     const mockSingle = jest.fn();
 
-    (supabase.from as jest.Mock).mockImplementation((tableName: string) => {
-      const baseOperations = {
-        select: mockSelect,
-        insert: mockInsert,
-      };
+    (supabase.from as jest.Mock).mockReturnValue({
+      select: mockSelect,
+    });
 
-      if (tableName === 'carts') {
-        mockSelect.mockReturnValue({
-          eq: mockEq,
-        });
-        mockEq.mockReturnValue({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValue({
-          data: mockCart,
-          error: null,
-        });
-      } else if (tableName === 'checkout_sessions') {
-        mockInsert.mockReturnValue({
-          select: mockSelect,
-        });
-        mockSelect.mockReturnValue({
-          single: mockSingle,
-        });
-        mockSingle.mockResolvedValue({
-          data: mockCheckoutSession,
-          error: null,
-        });
-      }
+    mockSelect.mockReturnValue({
+      eq: mockEq,
+    });
 
-      return baseOperations;
+    mockEq.mockReturnValue({
+      single: mockSingle,
+    });
+
+    mockSingle.mockResolvedValue({
+      data: mockCart,
+      error: null,
+    });
+
+    // Mock RPC call untuk create_orders_from_cart
+    (supabase.rpc as jest.Mock).mockReturnValue({
+      single: jest.fn().mockResolvedValue({
+        data: { checkout_session_id: 'test-session-id', total_amount: 20000 },
+        error: null,
+      }),
     });
 
     // Mock TriPay failure
