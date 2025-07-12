@@ -154,4 +154,68 @@ router.get('/:storeId', async (req, res) => {
   }
 });
 
+// Endpoint untuk menghapus toko (Dilindungi)
+router.delete('/delete/:storeId', authMiddleware, async (req, res) => {
+  try {
+    const { storeId } = req.params;
+    const userId = req.user.id;
+
+    // Verifikasi ownership
+    const { data: store, error: checkError } = await supabase
+      .from('stores')
+      .select('owner_id')
+      .eq('id', storeId)
+      .single();
+
+    if (checkError || !store) {
+      return res.status(404).json({ message: 'Toko tidak ditemukan' });
+    }
+
+    if (store.owner_id !== userId) {
+      return res.status(403).json({ message: 'Tidak memiliki akses untuk menghapus toko ini' });
+    }
+
+    // Hapus semua produk terkait terlebih dahulu
+    const { error: deleteProductsError } = await supabase
+      .from('products')
+      .delete()
+      .eq('store_id', storeId);
+
+    if (deleteProductsError) {
+      console.error('Error deleting products:', deleteProductsError);
+      throw deleteProductsError;
+    }
+
+    // Hapus toko
+    const { error: deleteStoreError } = await supabase
+      .from('stores')
+      .delete()
+      .eq('id', storeId);
+
+    if (deleteStoreError) throw deleteStoreError;
+
+    // Update profile is_seller jika user tidak memiliki toko lain
+    const { data: remainingStores, error: checkStoresError } = await supabase
+      .from('stores')
+      .select('id')
+      .eq('owner_id', userId);
+
+    if (!checkStoresError && (!remainingStores || remainingStores.length === 0)) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_seller: false })
+        .eq('id', userId);
+
+      if (profileError) {
+        console.warn('Failed to update profile seller status:', profileError.message);
+      }
+    }
+
+    res.status(200).json({ message: 'Toko berhasil dihapus' });
+  } catch (error: any) {
+    console.error('Store deletion error:', error);
+    res.status(500).json({ message: 'Gagal menghapus toko', error: error.message });
+  }
+});
+
 export default router; 

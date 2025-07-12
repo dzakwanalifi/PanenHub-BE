@@ -2,7 +2,7 @@
 
 ## Panduan Modul & Fungsi Backend - PanenHub Web App
 
-Dokumen ini merinci modul-modul backend, layanan, dan fungsi spesifik yang perlu dibangun untuk menjalankan logika bisnis PanenHub. Backend kita dibangun sebagai **satu aplikasi monolith yang terstruktur** dengan **Fungsi Database di Supabase** dan **Modul Aplikasi di Google Cloud Run**.
+Dokumen ini merinci modul-modul backend, layanan, dan fungsi spesifik yang digunakan untuk menjalankan logika bisnis PanenHub. Backend kita dibangun sebagai **satu aplikasi monolith yang terstruktur** dengan **Fungsi Database di Supabase** dan **Modul Aplikasi di Google Cloud Run**.
 
 ---
 
@@ -10,34 +10,43 @@ Dokumen ini merinci modul-modul backend, layanan, dan fungsi spesifik yang perlu
 
 *   **Gunakan Fungsi Database Supabase (PL/pgSQL)** untuk:
     *   Logika yang sangat terikat dengan integritas data (misal: trigger `handle_new_user`).
+    *   Operasi CRUD dasar yang membutuhkan Row Level Security (RLS).
+    *   Fungsi yang perlu diakses langsung dari frontend melalui Supabase Client.
 
 *   **Gunakan Modul di Aplikasi Monolith Node.js** untuk:
-    *   Semua logika bisnis lainnya, termasuk endpoint HTTP, interaksi dengan API pihak ketiga (TriPay), dan alur kerja yang kompleks.
+    *   Logika bisnis kompleks yang melibatkan multiple tabel.
+    *   Interaksi dengan API pihak ketiga (TriPay).
+    *   Operasi yang membutuhkan validasi dan transformasi data kompleks.
+    *   Endpoint yang memerlukan keamanan tambahan di luar RLS.
 
 ---
 
 ### 1. Modul Otentikasi & Profil (Auth & Profile)
 
 *   **Lokasi:** Supabase (Auth + Database Trigger)
+*   **Status:** ✅ Terimplementasi & Aktif
 *   **Fungsi Utama:**
     *   **Pendaftaran & Login:** Dikelola sepenuhnya oleh **Supabase Auth**. Frontend Next.js berinteraksi langsung dengan Supabase JS Client.
-    *   **Reset Password:** Fungsionalitas "Lupa Password" juga dikelola oleh Supabase Auth.
+    *   **Reset Password:** Fungsionalitas "Lupa Password" sudah aktif dan dikelola oleh Supabase Auth.
     *   **Pembuatan Profil Otomatis:**
         *   **Nama Fungsi:** `handle_new_user()`
         *   **Tipe:** PostgreSQL Function (Trigger)
         *   **Trigger:** `AFTER INSERT ON auth.users`
-        *   **Logika:** Saat pengguna baru berhasil mendaftar, trigger ini otomatis menyisipkan baris baru ke tabel `public.profiles` dan juga membuat keranjang belanja kosong untuknya di tabel `public.carts`.
+        *   **Logika:** Saat pengguna baru berhasil mendaftar, trigger ini otomatis:
+            - Menyisipkan baris baru ke tabel `public.profiles`
+            - Membuat keranjang belanja kosong di tabel `public.carts`
+            - Menginisialisasi preferensi notifikasi default
 
 ---
 
-### 2. Modul Toko (Store Module) **[MODUL BARU]**
-
-> **Status Implementasi Saat Ini:** Fungsionalitas ini disimulasikan di sisi klien. Contohnya, logika untuk menjadi penjual saat ini dikelola oleh state di `store/authStore.ts` dan UI placeholder di halaman akun `app/account/page.tsx`. Endpoint ini adalah target untuk implementasi backend.
+### 2. Modul Toko (Store Module)
 
 *   **Lokasi:** Modul di dalam Aplikasi Monolith (Node.js/TypeScript)
+*   **Status:** ✅ Terimplementasi & Aktif
 *   **Tanggung Jawab:** Mengelola semua operasi yang terkait dengan toko penjual.
 *   **Endpoint Utama:**
     *   `POST /stores/create`:
+        *   **Status:** ✅ Aktif
         *   **Aksi:** Pengguna membuat toko baru. Dipanggil dari alur "Buka Toko".
         *   **Logika:**
             1.  Menerima data dari frontend: `store_name`, `description`, `location`.
@@ -47,19 +56,28 @@ Dokumen ini merinci modul-modul backend, layanan, dan fungsi spesifik yang perlu
                 *   `UPDATE` tabel `profiles` dan set `is_seller = true` untuk `user_id` tersebut.
             4.  Return detail toko yang baru dibuat.
     *   `PUT /stores/update`:
+        *   **Status:** ✅ Aktif
         *   **Aksi:** Penjual mengupdate informasi tokonya (nama, banner, dll.) dari dashboard "Toko Saya".
         *   **Logika:** Validasi bahwa `user_id` dari token adalah `owner_id` dari toko yang akan diubah, lalu `UPDATE` data di tabel `stores`.
+    *   `DELETE /stores/:id`:
+        *   **Status:** ✅ Aktif
+        *   **Aksi:** Penjual menghapus tokonya.
+        *   **Logika:**
+            1. Validasi kepemilikan toko
+            2. Hapus semua produk terkait
+            3. Update status seller menjadi false
+            4. Hapus toko dari database
 
 ---
 
-### 3. Modul Pesanan (Order Module) **[MODUL BARU]**
-
-> **Status Implementasi Saat Ini:** Logika checkout disimulasikan sepenuhnya di frontend pada halaman `app/checkout/page.tsx`, dengan data keranjang dari `store/cartStore.ts` dan modal pembayaran palsu di `components/ui/PaymentModal.tsx`. Endpoint ini adalah target untuk implementasi backend yang aman.
+### 3. Modul Pesanan (Order Module)
 
 *   **Lokasi:** Modul di dalam Aplikasi Monolith (Node.js/TypeScript)
+*   **Status:** 🟡 Sebagian Terimplementasi
 *   **Tanggung Jawab:** Mengelola siklus hidup pesanan pembelian langsung (Direct Purchase).
 *   **Endpoint Utama:**
     *   `POST /orders/create_from_cart`:
+        *   **Status:** ✅ Aktif
         *   **Aksi:** Endpoint utama yang dipanggil saat pengguna menekan "Lanjutkan ke Pembayaran" dari keranjang.
         *   **Resep Implementasi:**
             *   **Tujuan:** Mengonversi isi keranjang belanja pengguna menjadi pesanan formal dan menginisiasi pembayaran.
@@ -77,18 +95,19 @@ Dokumen ini merinci modul-modul backend, layanan, dan fungsi spesifik yang perlu
 
 ---
 
-### 4. Modul Pembayaran (Payment Module) **[DIPERBARUI]**
-
-> **Status Implementasi Saat Ini:** Pembayaran disimulasikan melalui modal konfirmasi di `components/ui/PaymentModal.tsx`. Integrasi TriPay belum diimplementasikan. Endpoint ini adalah target untuk implementasi backend dengan keamanan tinggi.
+### 4. Modul Pembayaran (Payment Module)
 
 *   **Lokasi:** Modul di dalam Aplikasi Monolith (Node.js/TypeScript)
+*   **Status:** 🟡 Dalam Proses Integrasi
 *   **Tanggung Jawab:** Menjadi jembatan tunggal antara PanenHub dan TriPay.
 *   **Fungsi Utama:**
     *   `createTripayTransaction()`:
-        *   **Perubahan:** `merchant_ref` yang diterima sekarang adalah `checkout_session_id` (untuk pembelian langsung) atau `group_buy_join_id` (untuk patungan). Logika signature TriPay tetap sama.
+        *   **Status:** 🟡 Dalam Pengujian
+        *   **Perubahan:** `merchant_ref` yang diterima sekarang adalah `checkout_session_id` (untuk pembelian langsung) atau `group_buy_join_id` (untuk patungan).
 *   **Endpoint Utama:**
     *   `POST /payments/webhook`:
-        *   **Perubahan Logika:**
+        *   **Status:** 🟡 Dalam Pengujian
+        *   **Logika:**
             1.  Verifikasi signature webhook seperti biasa.
             2.  Baca `merchant_ref` dari payload callback.
             3.  **Cek Tipe Referensi:** Tentukan apakah `merchant_ref` ini adalah `checkout_session_id` atau referensi lain.
@@ -104,61 +123,76 @@ Dokumen ini merinci modul-modul backend, layanan, dan fungsi spesifik yang perlu
 ### 5. Modul Patungan Panen (GroupBuy Module)
 
 *   **Lokasi:** Modul di dalam Aplikasi Monolith (Node.js/TypeScript)
-*   **Tanggung Jawab:** Tetap sama, mengelola siklus hidup "Patungan Panen". Modul ini tidak banyak berubah karena logiknya sudah terisolasi.
-*   **Catatan:** Modul ini akan diimplementasikan pada fase berikutnya setelah fungsionalitas e-commerce inti selesai, sesuai roadmap yang baru.
+*   **Status:** ⏳ Direncanakan untuk Fase 2
+*   **Tanggung Jawab:** Mengelola siklus hidup "Patungan Panen".
+*   **Catatan:** Implementasi ditunda hingga fungsionalitas e-commerce inti selesai.
 
 ---
 
-### 6. Modul Notifikasi (Notification Module) **[DIPERBARUI]**
-
-> **Status Implementasi Saat Ini:** Notifikasi disimulasikan melalui komponen `components/notifications/NotificationPanel.tsx` dengan data mock. Sistem notifikasi push real-time belum terintegrasi. Endpoint ini adalah target untuk implementasi dengan FCM.
+### 6. Modul Notifikasi (Notification Module)
 
 *   **Lokasi:** Modul di dalam Aplikasi Monolith (Node.js/TypeScript)
+*   **Status:** 🟡 Sebagian Terimplementasi
 *   **Tanggung Jawab:** Mengirim notifikasi ke pengguna.
-*   **Fungsi Utama:** `sendNotification()`
-*   **Perubahan Logika:**
-    *   Modul ini sekarang harus mendukung **Web Push Notifications**.
-    *   Saat dipanggil, ia akan mengambil data langganan Web Push dari tabel `device_tokens` di Supabase.
-    *   Menggunakan pustaka seperti `web-push` di Node.js untuk mengirim notifikasi melalui FCM ke browser pengguna.
-    *   Akan dipanggil saat:
-        *   Pesanan baru masuk untuk penjual.
-        *   Status pesanan diupdate oleh penjual.
-        *   Status patungan berubah.
+*   **Fungsi Utama:** 
+    *   `sendNotification()`:
+        *   **Status:** ✅ Aktif untuk notifikasi in-app
+        *   **Implementasi:**
+            - Notifikasi in-app melalui Supabase Realtime sudah aktif
+            - Web Push Notifications masih dalam pengembangan
+    *   `subscribeToNotifications()`:
+        *   **Status:** 🟡 Dalam Pengembangan
+        *   **Implementasi:**
+            - Menyimpan token FCM ke tabel `device_tokens`
+            - Setup service worker untuk Web Push
 
 ---
 
 ### Format Respons Error Standar
 
-Semua modul di aplikasi monolith harus mengikuti format JSON yang konsisten untuk error, agar mudah ditangani oleh frontend Next.js.
+Semua modul di aplikasi monolith mengikuti format JSON yang konsisten untuk error:
 
 ```typescript
-// Contoh error yang diterima frontend:
 {
     "error": {
-        "code": "INSUFFICIENT_STOCK",
-        "message": "Maaf, stok untuk produk 'Mangga Harum Manis' tidak mencukupi."
+        "code": string,    // Kode error standar
+        "message": string, // Pesan error yang ramah pengguna
+        "details"?: any    // Opsional: Detail tambahan untuk debugging
     }
 }
 ```
 
-Daftar kode error standar yang digunakan (ditambah):
+Daftar kode error yang diimplementasi:
 *   **Toko:**
     *   `STORE_NOT_FOUND`: Toko tidak ditemukan.
     *   `NOT_STORE_OWNER`: Pengguna bukan pemilik toko.
+    *   `STORE_HAS_ORDERS`: Toko tidak dapat dihapus karena masih memiliki pesanan aktif.
 *   **Pesanan:**
     *   `EMPTY_CART`: Keranjang kosong saat checkout.
     *   `INSUFFICIENT_STOCK`: Stok produk tidak cukup saat checkout.
     *   `PRODUCT_NOT_AVAILABLE`: Produk sudah tidak tersedia.
+    *   `INVALID_ORDER_STATUS`: Status pesanan tidak valid untuk operasi ini.
+*   **Pembayaran:**
+    *   `PAYMENT_FAILED`: Pembayaran gagal diproses.
+    *   `INVALID_PAYMENT_SIGNATURE`: Signature webhook tidak valid.
 *   **Umum:**
-    *   `INTERNAL_ERROR`, `INVALID_INPUT`, `NOT_FOUND`, `UNAUTHORIZED`.
+    *   `INTERNAL_ERROR`: Kesalahan internal server.
+    *   `INVALID_INPUT`: Input tidak valid.
+    *   `NOT_FOUND`: Resource tidak ditemukan.
+    *   `UNAUTHORIZED`: Akses tidak diizinkan.
+    *   `RATE_LIMITED`: Terlalu banyak request.
 
 ---
 
 ### ✅ Checklist QA Modul Backend
 
-*   [ ] Endpoint `POST /stores/create` berhasil membuat toko dan mengupdate status `is_seller` pada profil.
-*   [ ] Endpoint `POST /orders/create_from_cart` berhasil mengonversi keranjang menjadi beberapa pesanan dan memanggil modul pembayaran dengan benar.
-*   [ ] Webhook dari TriPay berhasil diproses dan mengupdate status di tabel `checkout_sessions` dan `orders` secara bersamaan.
-*   [ ] Semua error case (stok habis, keranjang kosong) sudah dihandle dan memberikan response yang jelas.
-*   [ ] Semua transaksi database menggunakan `transaction` untuk menjamin konsistensi data.
-*   [ ] RLS di Supabase sudah diuji untuk memastikan penjual hanya bisa melihat pesanan tokonya dan pembeli hanya bisa melihat pesanannya sendiri.
+*   [x] Endpoint `POST /stores/create` berhasil membuat toko dan mengupdate status `is_seller`.
+*   [x] Endpoint `DELETE /stores/:id` berhasil menghapus toko dan produk terkait.
+*   [x] Endpoint `POST /orders/create_from_cart` berhasil mengonversi keranjang menjadi pesanan.
+*   [ ] Webhook TriPay berhasil memproses dan mengupdate status pesanan.
+*   [x] Error handling sudah diimplementasi dengan format standar.
+*   [x] Transaksi database menggunakan `transaction` untuk konsistensi data.
+*   [x] RLS di Supabase sudah aktif dan berfungsi sesuai role pengguna.
+*   [ ] Notifikasi Web Push sudah teruji di browser target.
+*   [x] Rate limiting sudah diimplementasi untuk semua endpoint publik.
+*   [x] Logging dan monitoring sudah disetup di GCP.

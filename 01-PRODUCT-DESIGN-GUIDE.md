@@ -112,15 +112,24 @@ Alur ini dirancang untuk mobile, dan akan beradaptasi di desktop.
     *   **Mobile & Desktop:** Halaman baru dimuat untuk menampilkan detail.
 3.  **Tambah ke Keranjang:** Pengguna memilih kuantitas dan menekan tombol **"Tambah ke Keranjang"**. Sebuah notifikasi (toast) akan muncul, dan ikon keranjang di navigasi diperbarui dengan *badge* jumlah.
 4.  **Halaman Keranjang:** Pengguna menavigasi ke halaman keranjang (`/cart`) yang menampilkan daftar item.
-5.  **Checkout:** Dari halaman keranjang, pengguna menekan **"Lanjutkan ke Pembayaran"**. Alur checkout multi-langkah yang jelas:
-    *   Langkah 1: Informasi Pengiriman.
-    *   Langkah 2: Ringkasan & Pembayaran.
+5.  **Checkout:** Dari halaman keranjang, pengguna menekan **"Lanjutkan ke Pembayaran"**. 
+    *   Backend akan memanggil fungsi `create_orders_from_cart` yang secara transaksional:
+        - Mengonversi isi keranjang menjadi pesanan formal untuk setiap toko
+        - Mengosongkan keranjang pengguna
+        - Mengembalikan `checkout_session_id` untuk proses pembayaran
+    *   Alur checkout multi-langkah yang jelas:
+        - Langkah 1: Informasi Pengiriman
+        - Langkah 2: Ringkasan & Pembayaran
 6.  **Konfirmasi Sukses:** Halaman konfirmasi pesanan yang jelas.
 
 #### 4.2. Alur Buka Toko & Manajemen (Seller Flow)
 
 *Tujuan: Memberikan pengalaman yang optimal di mobile dan desktop.*
-1.  **Buka Toko:** Alur pendaftaran toko sama seperti sebelumnya (diakses dari halaman "Akun"), dirancang untuk mobile.
+1.  **Buka Toko:** 
+    *   Alur pendaftaran toko diakses dari halaman "Akun", dirancang untuk mobile.
+    *   Saat pengguna membuat toko, backend memanggil fungsi `create_store_and_set_seller` yang secara transaksional:
+        - Membuat entitas toko baru
+        - Mengupdate status profil pengguna menjadi `is_seller`
 2.  **Dashboard "Toko Saya":**
     *   **Mobile:** Dashboard dirancang vertikal dan ringkas. Fokus pada tugas paling penting: melihat pesanan baru dan statistik kunci. Aksi seperti "Tambah Produk" diakses melalui tombol besar atau FAB.
     *   **Desktop:** Dashboard menggunakan tata letak multi-kolom.
@@ -152,3 +161,59 @@ Alur ini dirancang untuk mobile, dan akan beradaptasi di desktop.
 #### ✅ Tombol Aksi Utama (CTA)
 *   **Desain:** Latar belakang hijau muda (`#A5D6A7`), teks abu-abu gelap (`#1F2937`), `border-radius: 8px`.
 *   **Hover State:** Warna latar menjadi lebih cerah untuk memberikan feedback interaktif.
+
+#### 5.1. Pola Desain Notifikasi
+
+*   **Permintaan Izin:**
+    *   Setelah login pertama kali, sebuah *toast* non-intrusif akan muncul di bagian bawah layar dengan tombol "Aktifkan Notifikasi Pesanan".
+    *   Toast menggunakan warna latar `#F3F4F6` dengan ikon lonceng dan pesan yang ramah.
+
+*   **Tampilan Notifikasi:**
+    *   Menggunakan format asli browser (native browser notifications).
+    *   **Format Judul:** Disesuaikan dengan jenis notifikasi:
+        - Pesanan Baru: "Pesanan Baru Diterima! 🎉"
+        - Status Pesanan: "Pesanan #[ID] [Status]"
+        - Pembayaran: "Pembayaran [Status]"
+    *   **Format Isi:** Deskripsi singkat dan jelas dengan call-to-action.
+        - Contoh: "Anda baru saja menerima pesanan baru untuk [Nama Produk]. Segera periksa dashboard Anda."
+
+*   **Pusat Notifikasi:**
+    *   **Ikon Lonceng:** Terletak di header dengan badge counter untuk notifikasi belum dibaca.
+    *   **Panel Dropdown:** Muncul saat mengklik ikon, menampilkan:
+        - Daftar notifikasi terbaru (maks. 5)
+        - Tombol "Lihat Semua" yang mengarah ke halaman notifikasi lengkap
+        - Status dibaca/belum dibaca dengan indikator titik biru
+
+#### 5.2. Pola Desain Dashboard Penjual
+
+*   **Kartu Statistik:**
+    *   **BalanceCard (Pendapatan):**
+        - Header: Judul "Saldo" dengan font 18px Semi-Bold
+        - Nominal: Font 28px Bold dengan format currency
+        - Ikon: Dompet/Wallet di kanan atas
+        - Background: Gradien hijau muda ke putih
+    
+    *   **OrderStatsCard (Pesanan):**
+        - Layout: Grid 2x2 menampilkan status pesanan
+        - Setiap status menampilkan angka dengan label
+        - Status sesuai enum database:
+            * 'processing' (Diproses)
+            * 'shipped' (Dikirim)
+            * 'delivered' (Diterima)
+            * 'cancelled' (Dibatalkan)
+
+*   **Tabel Data:**
+    *   **Header:**
+        - Background: `#F3F4F6`
+        - Font: 14px Semi-Bold
+        - Padding: 12px 16px
+    *   **Baris Data:**
+        - Hover state dengan background `#F9FAFB`
+        - Border bottom: 1px solid `#E5E7EB`
+    *   **Aksi:**
+        - Tombol aksi menggunakan ikon dengan tooltip
+        - Posisi: Rata kanan dalam kolom terakhir
+    *   **Paginasi:**
+        - Tampilan: Nomor halaman + Previous/Next
+        - Posisi: Bawah tabel, rata kanan
+        - Limit: 10 item per halaman

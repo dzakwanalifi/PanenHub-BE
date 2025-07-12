@@ -4,13 +4,13 @@
 
 Dokumen ini menjelaskan arsitektur teknis, tumpukan teknologi (tech stack), dan alur data untuk platform PanenHub. Tujuannya adalah memberikan panduan yang jelas bagi tim developer untuk membangun sistem yang andal, skalabel, dan berperforma tinggi.
 
-> **Catatan Status Saat Ini:** Dokumen ini menguraikan **arsitektur target** yang lengkap. Perlu diketahui bahwa implementasi saat ini masih dalam tahap **standalone frontend (Next.js)**. Logika bisnis dan data masih disimulasikan menggunakan data mock dan state management sisi klien (Zustand). Backend service (GCP) dan koneksi database (Supabase) belum terintegrasi.
+> **Catatan Status Saat Ini:** Dokumen ini menguraikan arsitektur yang sedang diimplementasikan. Backend service sudah terintegrasi dengan Supabase untuk autentikasi dan penyimpanan data. Beberapa fitur kunci seperti manajemen toko dan produk sudah berfungsi, sementara fitur lain seperti integrasi pembayaran masih dalam pengembangan.
 
 ---
 
 ### 1. Filosofi Arsitektur: Monolith Terstruktur untuk Kecepatan MVP
 
-Kita mengadopsi pendekatan pragmatis yang memprioritaskan kecepatan rilis MVP. Logika bisnis backend akan dibangun sebagai **satu aplikasi monolitik yang terstruktur dengan baik**, yang di-deploy sebagai **satu layanan tunggal di Google Cloud Run**.
+Kita mengadopsi pendekatan pragmatis yang memprioritaskan kecepatan rilis MVP. Logika bisnis backend dibangun sebagai **satu aplikasi monolitik yang terstruktur dengan baik**, yang di-deploy sebagai **satu layanan tunggal di Google Cloud Run**.
 
 **Alasan Pendekatan Ini:**
 * **Pengembangan Super Cepat:** Mengeliminasi kompleksitas komunikasi antar layanan dan manajemen multi-repo/multi-layanan, memungkinkan tim untuk fokus membangun fitur.
@@ -18,18 +18,22 @@ Kita mengadopsi pendekatan pragmatis yang memprioritaskan kecepatan rilis MVP. L
 * **Evolusi di Masa Depan:** Arsitektur monolit ini dirancang secara modular. Jika di masa depan ada bagian yang menjadi *bottleneck*, kita bisa dengan mudah mengekstraknya menjadi *microservice* terpisah.
 
 1.  **Frontend (Jamstack):** Aplikasi web kita dibangun menggunakan **Next.js (React)**. Ini memungkinkan kita untuk mendapatkan yang terbaik dari dua dunia:
-    *   **Static Site Generation (SSG):** Halaman yang datanya relatif statis seperti halaman detail produk (`/products/[id]`) dan halaman toko (`/store/[storeId]`) **saat ini di-pre-render saat build** menggunakan `generateStaticParams`. Ini memberikan performa pemuatan awal yang sangat cepat.
-    *   **Server-Side Rendering (SSR):** Halaman yang memerlukan data yang lebih dinamis **akan menjadi target** untuk di-render di sisi server, memberikan **SEO (Search Engine Optimization)** yang baik.
+    *   **Static Site Generation (SSG):** Halaman yang datanya relatif statis seperti halaman detail produk (`/products/[id]`) dan halaman toko (`/store/[storeId]`) di-pre-render saat build menggunakan `generateStaticParams`. Ini memberikan performa pemuatan awal yang sangat cepat.
+    *   **Server-Side Rendering (SSR):** Halaman yang memerlukan data yang lebih dinamis di-render di sisi server, memberikan **SEO (Search Engine Optimization)** yang baik.
     *   **Client-Side Rendering (CSR):** Interaksi dinamis seperti di dalam dashboard "Toko Saya" (`/dashboard/*`), keranjang belanja (`/cart`), dan halaman akun (`/account`) ditangani di sisi klien, memberikan pengalaman layaknya Single Page Application (SPA).
 
-2.  **Backend (Monolith Terstruktur):** Backend kita **akan** terdiri dari dua lapisan utama yang menyediakan API untuk frontend:
-    *   **Supabase sebagai Data & Auth API:** **Akan** berfungsi sebagai *Single Source of Truth* untuk data dan otentikasi.
-    *   **GCP sebagai Business Logic API:** Logika bisnis kompleks (pemrosesan pesanan, pembayaran, dll.) **akan** di-deploy sebagai **satu aplikasi monolith di Google Cloud Run**.
+2.  **Backend (Monolith Terstruktur):** Backend kita terdiri dari dua lapisan utama yang menyediakan API untuk frontend:
+    *   **Supabase sebagai Data & Auth API:** Berfungsi sebagai *Single Source of Truth* untuk data dan otentikasi. Sudah terintegrasi dan berfungsi untuk:
+        - Autentikasi pengguna (signup, login, reset password)
+        - Manajemen profil pengguna
+        - CRUD operasi untuk toko dan produk
+        - Manajemen pesanan dan keranjang belanja
+    *   **GCP sebagai Business Logic API:** Logika bisnis kompleks (pemrosesan pesanan, pembayaran, dll.) di-deploy sebagai **satu aplikasi monolith di Google Cloud Run**.
 
 **Alasan Pendekatan Ini:**
 *   **Performa & SEO Unggul:** Dengan Next.js, web app kita akan cepat dan ramah mesin pencari.
 *   **Skalabilitas Independen:** Frontend dan backend dapat diskalakan secara independen sesuai beban.
-*   **Keamanan:** Kunci API pihak ketiga akan tersimpan aman di backend GCP, tidak pernah terekspos ke browser klien.
+*   **Keamanan:** Kunci API pihak ketiga tersimpan aman di backend GCP, tidak pernah terekspos ke browser klien.
 
 ---
 
@@ -71,11 +75,11 @@ graph TD
 | Kategori | Teknologi / Layanan | Status | Fungsi Utama |
 | :--- | :--- | :--- |:--- |
 | **Aplikasi Web (Frontend)** | **Next.js (React)** | **Digunakan** | Membangun aplikasi web yang cepat, SEO-friendly, dan responsif. |
-| **Hosting Frontend** | **Vercel** atau **Netlify** | **Target** | Platform hosting global yang teroptimasi untuk aplikasi Jamstack/Next.js. |
-| **Database & Auth** | **Supabase Cloud** | **Target** | Database (PostgreSQL), Otentikasi Pengguna, Penyimpanan File, Realtime API. |
-| **Backend Services** | **Google Cloud Run** | **Target** | Menjalankan aplikasi backend monolith untuk logika bisnis. |
-| **Layanan Pembayaran** | **TriPay API** | **Target** | Memproses transaksi pembayaran dan menerima notifikasi webhook. |
-| **Layanan Notifikasi** | **Firebase Cloud Messaging (FCM)** | **Target** | Mengirim push notification ke browser pengguna. |
+| **Hosting Frontend** | **Vercel** | **Digunakan** | Platform hosting global yang teroptimasi untuk aplikasi Next.js. |
+| **Database & Auth** | **Supabase Cloud** | **Digunakan** | Database (PostgreSQL), Otentikasi Pengguna, Penyimpanan File, Realtime API. |
+| **Backend Services** | **Google Cloud Run** | **Digunakan** | Menjalankan aplikasi backend monolith untuk logika bisnis. |
+| **Layanan Pembayaran** | **TriPay API** | **Dalam Integrasi** | Memproses transaksi pembayaran dan menerima notifikasi webhook. |
+| **Layanan Notifikasi** | **Firebase Cloud Messaging (FCM)** | **Direncanakan** | Mengirim push notification ke browser pengguna. |
 | **Styling** | **Tailwind CSS** | **Digunakan** | Framework CSS utility-first untuk membangun desain kustom. |
 | **State Management** | **Zustand** | **Digunakan** | Mengelola state global aplikasi (keranjang belanja, sesi pengguna, state UI). |
 | **Manajemen Formulir** | **React Hook Form** | **Digunakan** | Untuk validasi dan manajemen state pada formulir. |
@@ -155,16 +159,42 @@ sequenceDiagram
 
 ---
 
-### 7. Checklist Setup Lingkungan Kerja Awal
+### 7. Checklist Setup Lingkungan Kerja
 
-*   **Setup Frontend (Saat Ini):**
+*   **Setup Frontend:**
     1.  [ ] `git clone` repositori frontend.
     2.  [ ] Jalankan `npm install`.
-    3.  [ ] Jalankan `npm run dev`. Aplikasi web akan berjalan di `localhost:3000`.
-    4.  *(Catatan: Tidak ada file `.env` yang diperlukan saat ini karena semua data masih mock).*
+    3.  [ ] Salin `.env.example` ke `.env` dan isi dengan kredensial Supabase:
+        ```
+        NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+        NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+        ```
+    4.  [ ] Jalankan `npm run dev`. Aplikasi web akan berjalan di `localhost:3000`.
 
-*   **Setup Backend (Target):**
+*   **Setup Backend:**
     1.  [ ] `git clone` repositori backend monolith.
     2.  [ ] Jalankan `npm install`.
-    3.  [ ] Setup file `.env` dengan kredensial Supabase dan TriPay.
-    4.  [ ] Jalankan `npm run dev`. Aplikasi backend akan berjalan di `localhost:8000`.
+    3.  [ ] Salin `.env.example` ke `.env` dan isi dengan kredensial yang diperlukan:
+        ```
+        PORT=8080
+        SUPABASE_URL=https://your-project.supabase.co
+        SUPABASE_SERVICE_KEY=your-service-key
+        TRIPAY_API_KEY=your-tripay-key
+        TRIPAY_PRIVATE_KEY=your-tripay-private-key
+        ```
+    4.  [ ] Jalankan `npm run dev`. Aplikasi backend akan berjalan di `localhost:8080`.
+
+*   **Setup Database & Auth:**
+    1.  [ ] Akses dashboard Supabase dan buat project baru.
+    2.  [ ] Jalankan SQL migration untuk membuat skema database:
+        ```sql
+        -- Jalankan script dari sql-functions.sql
+        ```
+    3.  [ ] Aktifkan autentikasi email/password di Supabase Authentication.
+    4.  [ ] Setup Row Level Security (RLS) policies untuk setiap tabel.
+
+*   **Setup Deployment:**
+    1.  [ ] Setup project di Google Cloud Platform.
+    2.  [ ] Aktifkan Cloud Run dan Container Registry.
+    3.  [ ] Setup GitHub Actions untuk CI/CD ke Cloud Run.
+    4.  [ ] Setup domain dan SSL di Vercel untuk frontend.

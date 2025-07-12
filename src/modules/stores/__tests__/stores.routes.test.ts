@@ -159,4 +159,102 @@ describe('Stores API - /api/v1/stores', () => {
     expect(response.status).toBe(501);
     expect(response.body.message).toBe('Not Implemented');
   });
+
+  // Test Case 7: Berhasil menghapus toko
+  it('should delete store successfully', async () => {
+    // Mock successful auth
+    (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    // Mock store ownership check
+    const mockSelect = jest.fn().mockReturnValue({
+      eq: jest.fn().mockReturnValue({
+        single: jest.fn().mockResolvedValue({
+          data: { owner_id: mockUser.id },
+          error: null,
+        })
+      })
+    });
+
+    // Mock delete operations
+    const mockDelete = jest.fn().mockReturnValue({
+      eq: jest.fn().mockResolvedValue({
+        error: null
+      })
+    });
+
+    // Mock remaining stores check
+    const mockStoresSelect = jest.fn().mockReturnValue({
+      eq: jest.fn().mockResolvedValue({
+        data: [],
+        error: null
+      })
+    });
+
+    // Mock profile update
+    const mockUpdate = jest.fn().mockReturnValue({
+      eq: jest.fn().mockResolvedValue({
+        error: null
+      })
+    });
+
+    (supabase.from as jest.Mock).mockImplementation((table) => ({
+      select: table === 'stores' ? 
+        (mockSelect.mockReturnValueOnce({
+          eq: jest.fn().mockReturnValue({
+            single: jest.fn().mockResolvedValue({
+              data: { owner_id: mockUser.id },
+              error: null
+            })
+          })
+        }).mockReturnValueOnce({
+          eq: jest.fn().mockResolvedValue({
+            data: [],
+            error: null
+          })
+        })) : mockSelect,
+      delete: mockDelete,
+      update: mockUpdate
+    }));
+
+    const response = await request(app)
+      .delete('/api/v1/stores/delete/test-store-id')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe('Toko berhasil dihapus');
+  });
+
+  // Test Case 8: Gagal menghapus toko yang bukan miliknya
+  it('should fail to delete store owned by another user', async () => {
+    // Mock successful auth
+    (supabase.auth.getUser as jest.Mock).mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    // Mock store ownership check - different owner
+    const mockSelect = jest.fn().mockReturnValue({
+      eq: jest.fn().mockReturnValue({
+        single: jest.fn().mockResolvedValue({
+          data: { owner_id: 'different-user-id' },
+          error: null,
+        })
+      })
+    });
+
+    (supabase.from as jest.Mock).mockReturnValue({
+      select: mockSelect
+    });
+
+    const response = await request(app)
+      .delete('/api/v1/stores/delete/test-store-id')
+      .set('Authorization', 'Bearer valid-token');
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('Tidak memiliki akses untuk menghapus toko ini');
+  });
+
 }); 
