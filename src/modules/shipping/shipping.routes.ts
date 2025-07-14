@@ -12,21 +12,21 @@ router.get('/methods', async (req, res) => {
         id: 'REGULER',
         name: 'Pengiriman Reguler',
         description: '3-5 hari kerja',
-        price: 10000,
+        price: 5000,
         estimatedDays: '3-5 hari'
       },
       {
         id: 'EXPRESS',
         name: 'Pengiriman Express',
         description: '1-2 hari kerja',
-        price: 25000,
+        price: 12000,
         estimatedDays: '1-2 hari'
       },
       {
         id: 'SAME_DAY',
         name: 'Pengiriman Same Day',
         description: 'Hari yang sama (untuk area tertentu)',
-        price: 50000,
+        price: 20000,
         estimatedDays: 'Hari yang sama'
       }
     ];
@@ -45,18 +45,18 @@ router.get('/calculate', async (req, res) => {
 
     // For now, return static calculation
     // In the future, integrate with shipping API (JNE, TIKI, POS, etc.)
-    let basePrice = 10000;
+    let basePrice = 5000;
     let multiplier = 1;
 
     switch (method) {
       case 'EXPRESS':
-        multiplier = 2.5;
+        multiplier = 2.4; // 12000
         break;
       case 'SAME_DAY':
-        multiplier = 5;
+        multiplier = 4; // 20000
         break;
       default:
-        multiplier = 1;
+        multiplier = 1; // 5000
     }
 
     const calculatedPrice = Math.round(basePrice * multiplier);
