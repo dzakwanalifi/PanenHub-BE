@@ -38,6 +38,7 @@ router.get('/', authMiddleware, async (req, res) => {
             price,
             unit,
             store_id,
+            image_urls,
             stores (
               store_name
             )
@@ -91,6 +92,7 @@ router.get('/', authMiddleware, async (req, res) => {
         price: item.products.price,
         unit: item.products.unit,
         store_id: item.products.store_id,
+        image_urls: item.products.image_urls,
         store: {
           store_name: item.products.stores.store_name
         }
@@ -360,4 +362,4 @@ router.delete('/items/:itemId', authMiddleware, async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

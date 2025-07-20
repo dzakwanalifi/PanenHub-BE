@@ -75,10 +75,63 @@ export const getAllCampaigns = async (req: Request, res: Response) => {
             .eq('status', 'active')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error fetching campaigns:', error);
+            throw error;
+        }
 
-        res.json(campaigns);
+        if (campaigns && campaigns.length > 0) {
+            return res.json(campaigns);
+        }
+
+        // If no campaigns are found, return mock data
+        console.log('No active campaigns found in DB, returning mock data.');
+        const mockCampaigns = [
+            {
+                id: 'mock-campaign-1',
+                status: 'active',
+                end_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                group_price: 150000,
+                target_quantity: 100,
+                current_quantity: 45,
+                product: {
+                    id: 'mock-product-1',
+                    name: 'Beras Organik Premium (Mock)',
+                    description: 'Beras pulen dan sehat, langsung dari petani.',
+                    price: 180000,
+                    image_url: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                },
+                store: {
+                    id: 'mock-store-1',
+                    store_name: 'Toko Tani Sejahtera (Mock)',
+                    banner_url: null,
+                },
+            },
+            {
+                id: 'mock-campaign-2',
+                status: 'active',
+                end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                group_price: 75000,
+                target_quantity: 200,
+                current_quantity: 110,
+                product: {
+                    id: 'mock-product-2',
+                    name: 'Minyak Goreng Kelapa (Mock)',
+                    description: 'Minyak goreng sehat dan berkualitas.',
+                    price: 90000,
+                    image_url: 'https://images.unsplash.com/photo-1625772299848-391b6a87d7b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                },
+                store: {
+                    id: 'mock-store-2',
+                    store_name: 'Warung Sembako Ibu (Mock)',
+                    banner_url: null,
+                },
+            }
+        ];
+        return res.json(mockCampaigns);
+
     } catch (error: any) {
+        console.error('Server error in getAllCampaigns:', error);
         res.status(500).json({ message: 'Failed to fetch campaigns', error: error.message });
     }
 };

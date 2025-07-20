@@ -45,7 +45,7 @@ app.use('/api/v1/user', usersRoutes);
 app.use('/api/v1/shipping', shippingRoutes);
 // app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/payments', paymentsRoutes);
-app.use('/api/v1/group-buy', groupBuyRoutes);
+app.use('/group-buy', groupBuyRoutes);
 
 // Error handling middleware
 app.use((err: any, req: any, res: any, next: any) => {
