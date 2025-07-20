@@ -16,7 +16,7 @@ import paymentsRoutes from './modules/payments/payments.routes';
 import groupBuyRoutes from './modules/groupbuy/groupbuy.routes';
 
 const app = express();
-const port = process.env.PORT || 8080;
+const port = parseInt(process.env.PORT || '8000', 10);
 
 // Setup logger
 const logger = pino({
@@ -54,9 +54,9 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 // Start server
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Server is running on port ${port}`);
     console.log(`📖 Health check: http://localhost:${port}/health`);
 });
 
-export default app; 
+export default app;
